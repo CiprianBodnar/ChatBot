@@ -1,32 +1,20 @@
 package com.example.vmac.WatBot;
 
-import android.app.job.JobParameters;
-import android.app.job.JobService;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
-public class MenuJobService extends JobService {
-    private boolean jobCanceled = false;
+public class MenuJobService extends BroadcastReceiver {
 
 
-    @Override
-    public boolean onStartJob(JobParameters jobParameters) {
-        doBackgroundTask();
-        return false;
-    }
-
-    private void doBackgroundTask() {
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                Log.i("VOLLEY", "time to eat");
-
-            }
-        }).start();
-    }
 
     @Override
-    public boolean onStopJob(JobParameters jobParameters) {
-        return false;
+    public void onReceive(Context context, Intent intent) {
+
+        Intent intentToBroadcast =  new Intent(MainActivity.DINNER);
+        LocalBroadcastManager.getInstance(context).sendBroadcast(intentToBroadcast);
+        Log.d("MyAlarmBelal", "Alarm just fired");
     }
 }

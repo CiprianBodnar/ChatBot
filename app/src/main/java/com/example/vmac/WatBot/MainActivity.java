@@ -2,17 +2,16 @@ package com.example.vmac.WatBot;
 
 import android.app.AlarmManager;
 import android.app.PendingIntent;
-import android.app.job.JobInfo;
-import android.app.job.JobScheduler;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
@@ -35,13 +34,14 @@ import com.google.gson.JsonParser;
 import com.ibm.watson.developer_cloud.android.library.audio.MicrophoneHelper;
 
 import java.io.UnsupportedEncodingException;
-import java.time.OffsetTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Calendar;
 
 
 public class MainActivity extends AppCompatActivity {
 
+    public static final String DINNER = "dinner";
     private RecyclerView recyclerView;
     private ChatAdapter mAdapter;
     private ArrayList messageArrayList;
@@ -57,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
     JsonParser jsonParser = new JsonParser();
     JsonObject jsonObject = new JsonObject();
     RequestQueue ExampleRequestQueue;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,8 +84,7 @@ public class MainActivity extends AppCompatActivity {
         this.inputMessage.setText("");
         this.initialRequest = true;
         getCall();
-
-        createNotification();
+        //---------------------------------------------
         btnSend.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -93,11 +93,11 @@ public class MainActivity extends AppCompatActivity {
                     if (userAskQuestion) {
                         final String inputmessage = MainActivity.inputMessage.getText().toString().trim();
                         chatBootAskQuestion(inputmessage, "1");
-                        jsonObject.addProperty("question",inputmessage);
+                        jsonObject.addProperty("question", inputmessage);
                         Log.i("GGG", jsonObject.toString());
                         postCall(jsonObject.toString());
 
-                    }else{
+                    } else {
                         sendMessage();
                     }
                 }
@@ -110,22 +110,50 @@ public class MainActivity extends AppCompatActivity {
                 recordMessage();
             }
         });
+        //.............................................................
+
+        Calendar calendar = setAlarmTimeForDinner(9, 23);
+        createReminder(calendar.getTimeInMillis());
+        LocalBroadcastManager.getInstance(this).registerReceiver(mSampleReceiver, new IntentFilter(DINNER));
+
     }
 
-    public void createNotification () {
-        Intent myIntent = new Intent(getApplicationContext() , NotifyService. class ) ;
-        AlarmManager alarmManager = (AlarmManager) getSystemService( ALARM_SERVICE ) ;
-        PendingIntent pendingIntent = PendingIntent. getService ( this, 0 , myIntent , 0 ) ;
-        Calendar calendar = Calendar. getInstance () ;
-        calendar.set(Calendar. SECOND , 0 ) ;
-        calendar.set(Calendar. MINUTE , 8 ) ;
-        calendar.set(Calendar. HOUR , 12 ) ;
-        calendar.set(Calendar. AM_PM , Calendar. PM ) ;
-        calendar.add(Calendar. DAY_OF_MONTH , 10 ) ;
-        alarmManager.setRepeating(AlarmManager. RTC_WAKEUP , calendar.getTimeInMillis() , 1000 * 60 * 60 * 24 , pendingIntent) ;
+    @NonNull
+    private Calendar setAlarmTimeForDinner(int hour, int minute) {
+        LocalTime timePicker = LocalTime.of(hour, minute);
+        Calendar calendar = Calendar.getInstance();
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            calendar.set(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH),
+                    timePicker.getHour(), timePicker.getMinute(), 0);
+        } else {
+            calendar.set(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH),
+                    timePicker.getHour(), timePicker.getMinute(), 0);
+        }
+        return calendar;
     }
 
-    // Speech to Text Record Audio permission
+    private MenuJobService mSampleReceiver = new MenuJobService() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            chatBootAskQuestion("Time for dinner, what do you preffer to eat?", "2");
+        }
+    };
+
+    private void createReminder(long time) {
+        //getting the alarm manager
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+
+        //creating a new intent specifying the broadcast receiver
+        Intent i = new Intent(this, MenuJobService.class);
+        //creating a pending intent using the intent
+        PendingIntent pi = PendingIntent.getBroadcast(this, 0, i, 0);
+
+        //setting the repeating alarm that will be fired every day
+        am.setRepeating(AlarmManager.RTC, time, AlarmManager.INTERVAL_DAY, pi);
+        Toast.makeText(this, "Alarm is set", Toast.LENGTH_SHORT).show();
+    }
+
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -151,8 +179,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-        // if (!permissionToRecordAccepted ) finish();
-
     }
 
 
@@ -192,8 +218,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void postCall(final String body) {
-
-
         String url = "http://10.0.2.2:5000/chat/question/Ciprian";
         StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
             @Override
@@ -227,14 +251,12 @@ public class MainActivity extends AppCompatActivity {
                     return null;
                 }
             }
-
-
         };
         ExampleRequestQueue.add(stringRequest);
 
     }
 
-    private void chatBootAskQuestion(String s, String s2) {
+    public void chatBootAskQuestion(String s, String s2) {
         Message outMessage = new Message();
         outMessage.setMessage(s);
         outMessage.setId(s2);
