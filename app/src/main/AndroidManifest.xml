@@ -39,6 +39,14 @@
             android:name=".MenuJobService"
             android:enabled="true"
             android:exported="true" />
+        <receiver
+            android:name=".BreakFastJobService"
+            android:enabled="true"
+            android:exported="true" />
+        <receiver
+            android:name=".LunchJobService"
+            android:enabled="true"
+            android:exported="true" />
     </application>
 
 </manifest>

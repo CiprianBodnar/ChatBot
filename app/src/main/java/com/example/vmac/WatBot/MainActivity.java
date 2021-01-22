@@ -42,6 +42,10 @@ import java.util.Calendar;
 public class MainActivity extends AppCompatActivity {
 
     public static final String DINNER = "dinner";
+    public static final String BREAKFAST = "breakfast";
+    public static final String LUNCH = "lunch";
+
+
     private RecyclerView recyclerView;
     private ChatAdapter mAdapter;
     private ArrayList messageArrayList;
@@ -112,14 +116,25 @@ public class MainActivity extends AppCompatActivity {
         });
         //.............................................................
 
-        Calendar calendar = setAlarmTimeForDinner(9, 23);
-        createReminder(calendar.getTimeInMillis());
+        Calendar dinnerCalendar = setAlarmTime(20, 42);
+        createDinnerReminder(dinnerCalendar.getTimeInMillis());
         LocalBroadcastManager.getInstance(this).registerReceiver(mSampleReceiver, new IntentFilter(DINNER));
+
+        //..........
+        Calendar breakfastCalendar = setAlarmTime(20, 44);
+        createBreakFestReminder(breakfastCalendar.getTimeInMillis());
+        LocalBroadcastManager.getInstance(this).registerReceiver(breakFastJobService, new IntentFilter(BREAKFAST));
+
+        // .............
+        Calendar lunchCalendar = setAlarmTime(13, 44);
+        createLunchReminder(lunchCalendar.getTimeInMillis());
+        LocalBroadcastManager.getInstance(this).registerReceiver(lunchJobService, new IntentFilter(LUNCH));
+
 
     }
 
     @NonNull
-    private Calendar setAlarmTimeForDinner(int hour, int minute) {
+    private Calendar setAlarmTime(int hour, int minute) {
         LocalTime timePicker = LocalTime.of(hour, minute);
         Calendar calendar = Calendar.getInstance();
         if (android.os.Build.VERSION.SDK_INT >= 23) {
@@ -132,19 +147,61 @@ public class MainActivity extends AppCompatActivity {
         return calendar;
     }
 
-    private MenuJobService mSampleReceiver = new MenuJobService() {
+    private final MenuJobService mSampleReceiver = new MenuJobService() {
         @Override
         public void onReceive(Context context, Intent intent) {
             chatBootAskQuestion("Time for dinner, what do you preffer to eat?", "2");
         }
     };
 
-    private void createReminder(long time) {
+    private final BreakFastJobService breakFastJobService = new BreakFastJobService() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            chatBootAskQuestion("Time for breakfasr, what do you preffer to eat?", "2");
+        }
+    };
+
+    private final LunchJobService lunchJobService = new LunchJobService() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            chatBootAskQuestion("Time for lunch, what do you preffer to eat?", "2");
+        }
+    };
+
+    private void createDinnerReminder(long time) {
         //getting the alarm manager
         AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 
         //creating a new intent specifying the broadcast receiver
         Intent i = new Intent(this, MenuJobService.class);
+        //creating a pending intent using the intent
+        PendingIntent pi = PendingIntent.getBroadcast(this, 0, i, 0);
+
+        //setting the repeating alarm that will be fired every day
+        am.setRepeating(AlarmManager.RTC, time, AlarmManager.INTERVAL_DAY, pi);
+        Toast.makeText(this, "Alarm is set", Toast.LENGTH_SHORT).show();
+    }
+
+    private void createBreakFestReminder(long time) {
+        //getting the alarm manager
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+
+        //creating a new intent specifying the broadcast receiver
+        Intent i = new Intent(this, BreakFastJobService.class);
+        //creating a pending intent using the intent
+        PendingIntent pi = PendingIntent.getBroadcast(this, 0, i, 0);
+
+        //setting the repeating alarm that will be fired every day
+        am.setRepeating(AlarmManager.RTC, time, AlarmManager.INTERVAL_DAY, pi);
+        Toast.makeText(this, "Alarm is set", Toast.LENGTH_SHORT).show();
+    }
+
+    private void createLunchReminder(long time) {
+        //getting the alarm manager
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+
+        //creating a new intent specifying the broadcast receiver
+        Intent i = new Intent(this, LunchJobService.class);
         //creating a pending intent using the intent
         PendingIntent pi = PendingIntent.getBroadcast(this, 0, i, 0);
 
