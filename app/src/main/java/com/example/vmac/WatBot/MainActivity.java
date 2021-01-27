@@ -4,18 +4,19 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.annotation.NonNull;
-import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -36,7 +37,9 @@ import com.ibm.watson.developer_cloud.android.library.audio.MicrophoneHelper;
 import java.io.UnsupportedEncodingException;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.List;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -44,6 +47,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String DINNER = "dinner";
     public static final String BREAKFAST = "breakfast";
     public static final String LUNCH = "lunch";
+    public static final int MAX_CALORIES = 2500;
 
 
     private RecyclerView recyclerView;
@@ -61,10 +65,14 @@ public class MainActivity extends AppCompatActivity {
     JsonParser jsonParser = new JsonParser();
     JsonObject jsonObject = new JsonObject();
     RequestQueue ExampleRequestQueue;
-
+    List<String> listOfMenus = new ArrayList<>();
+    double age, height, weight;
+    List<String> preferableMenus = new ArrayList<>();
+    String eatToday;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ExampleRequestQueue = Volley.newRequestQueue(this);
@@ -94,13 +102,37 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 if (checkInternetConnection()) {
 
+
                     if (userAskQuestion) {
                         final String inputmessage = MainActivity.inputMessage.getText().toString().trim();
-                        chatBootAskQuestion(inputmessage, "1");
-                        jsonObject.addProperty("question", inputmessage);
-                        Log.i("GGG", jsonObject.toString());
-                        postCall(jsonObject.toString());
+                        if (inputmessage.contains("body bmi")) {
+                            chatBootAskQuestion(inputmessage, "1");
+                            chatBootAskQuestion("Your bmi is " + bmi(height, weight) + " %", "2");
+                        } else if (inputmessage.contains("body fat")) {
+                            chatBootAskQuestion(inputmessage, "1");
+                            chatBootAskQuestion("Your body fat is " + bf(height, weight, age) + "%", "2");
+                        } else if (inputmessage.contains("hungry")) {
+                            chatBootAskQuestion(inputmessage, "1");
+                            String finalDestination = "";
+                            for (String menu : preferableMenus) {
+                                String finalMenuPreferaneResponse = "https://www.bbcgoodfood.com/recipes/collection/";
+                                finalMenuPreferaneResponse = finalMenuPreferaneResponse + menu;
+                                finalDestination = finalDestination + finalMenuPreferaneResponse + "\n";
 
+                            }
+                            chatBootAskQuestion("I suggest " + finalDestination, "2");
+                        } else if (inputmessage.contains("calories")) {
+                            chatBootAskQuestion(inputmessage, "1");
+                            jsonObject.addProperty("question", eatToday);
+                            Log.i("calories", eatToday);
+                            Log.i("da", jsonObject.toString());
+                            postCall(jsonObject.toString());
+                        } else {
+                            chatBootAskQuestion(inputmessage, "1");
+                            jsonObject.addProperty("question", inputmessage);
+                            Log.i("GGG", jsonObject.toString());
+                            postCall(jsonObject.toString());
+                        }
                     } else {
                         sendMessage();
                     }
@@ -116,21 +148,20 @@ public class MainActivity extends AppCompatActivity {
         });
         //.............................................................
 
-        Calendar dinnerCalendar = setAlarmTime(20, 42);
+    /*      Calendar dinnerCalendar = setAlarmTime(20, 42);
         createDinnerReminder(dinnerCalendar.getTimeInMillis());
         LocalBroadcastManager.getInstance(this).registerReceiver(mSampleReceiver, new IntentFilter(DINNER));
 
         //..........
-        Calendar breakfastCalendar = setAlarmTime(20, 44);
+      Calendar breakfastCalendar = setAlarmTime(20, 56);
         createBreakFestReminder(breakfastCalendar.getTimeInMillis());
         LocalBroadcastManager.getInstance(this).registerReceiver(breakFastJobService, new IntentFilter(BREAKFAST));
 
         // .............
-        Calendar lunchCalendar = setAlarmTime(13, 44);
+    /*    Calendar lunchCalendar = setAlarmTime(13, 44);
         createLunchReminder(lunchCalendar.getTimeInMillis());
         LocalBroadcastManager.getInstance(this).registerReceiver(lunchJobService, new IntentFilter(LUNCH));
-
-
+*/
     }
 
     @NonNull
@@ -150,21 +181,78 @@ public class MainActivity extends AppCompatActivity {
     private final MenuJobService mSampleReceiver = new MenuJobService() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            chatBootAskQuestion("Time for dinner, what do you preffer to eat?", "2");
+            chatBootAskQuestion("Time for dinner, what do you prefer to eat?", "2");
+
+        }
+    };
+
+    long delay = 2000; // 1 seconds after user stops typing
+    long last_text_edit = 0;
+    Handler handler = new Handler();
+
+    private Runnable input_finish_checker = new Runnable() {
+        public void run() {
+            if (System.currentTimeMillis() > (last_text_edit + delay - 500)) {
+                final String inputmessage = inputMessage.getText().toString().trim();
+                Message inputMessage = new Message();
+                inputMessage.setMessage(inputmessage);
+                inputMessage.setId("1");
+                messageArrayList.add(inputMessage);
+                if (inputmessage.toLowerCase().equals("yes")) {
+                    chatBootAskQuestion("Good choice!", "2");
+                    Thread.currentThread().interrupt(); //this is a MUST
+
+                } else {
+                    chatBootAskQuestion("Ok, i will notice this to not ask again.", "2");
+                    Thread.currentThread().interrupt(); //this is a MUST
+                }
+            }
         }
     };
 
     private final BreakFastJobService breakFastJobService = new BreakFastJobService() {
         @Override
-        public void onReceive(Context context, Intent intent) {
-            chatBootAskQuestion("Time for breakfasr, what do you preffer to eat?", "2");
+        public void onReceive(final Context context, final Intent intent) {
+            chatBootAskQuestion("Time for breakfast, what do you prefer to eat?", "2");
+
+
+            chatBootAskQuestion(listOfMenus.get(0), "2");
+            inputMessage.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count,
+                                              int after) {
+                }
+
+                @Override
+                public void onTextChanged(final CharSequence s, int start, int before,
+                                          int count) {
+                    //You need to remove this to run only once
+                    handler.removeCallbacks(input_finish_checker);
+
+                }
+
+                @Override
+                public void afterTextChanged(final Editable s) {
+                    //avoid triggering event when text is empty
+                    if (s.length() > 0) {
+                        last_text_edit = System.currentTimeMillis();
+                        handler.postDelayed(input_finish_checker, delay);
+                    } else {
+                        // handler.removeCallbacks(input_finish_checker);
+                    }
+                }
+            });
+
+            mAdapter.notifyDataSetChanged();
         }
     };
+
 
     private final LunchJobService lunchJobService = new LunchJobService() {
         @Override
         public void onReceive(Context context, Intent intent) {
             chatBootAskQuestion("Time for lunch, what do you preffer to eat?", "2");
+
         }
     };
 
@@ -250,6 +338,7 @@ public class MainActivity extends AppCompatActivity {
         mAdapter.notifyDataSetChanged();
     }
 
+
     private void getCall() {
 
         String url = "http://10.0.2.2:5000/profile";
@@ -283,6 +372,9 @@ public class MainActivity extends AppCompatActivity {
                 JsonObject jsonObject = (JsonObject) jsonParser.parse(response);
                 String jsonAnswer = String.valueOf(jsonObject.get("answer"));
                 Log.i("jsonAnsw", jsonAnswer);
+                jsonAnswer = jsonAnswer.replace("\"", "").trim();
+
+                int numCalories = Integer.parseInt(jsonAnswer.split(" ")[0]);
                 chatBootAskQuestion(jsonAnswer, "2");
             }
         }, new Response.ErrorListener() {
@@ -307,6 +399,35 @@ public class MainActivity extends AppCompatActivity {
                     VolleyLog.wtf("Unsupported Encoding while trying to get the bytes of %s using %s", body, "utf-8");
                     return null;
                 }
+            }
+        };
+        ExampleRequestQueue.add(stringRequest);
+
+    }
+
+    private void postCall2(final String body) {
+        String url = "http://10.0.2.2:5000/menu/breakfast/response";
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String response) {
+                Log.i("REs", response);
+
+                chatBootAskQuestion(response, "2");
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.e("VOLLEY", error.toString());
+            }
+        }) {
+            @Override
+            public String getBodyContentType() {
+                return "application/json; charset=utf-8";
+            }
+
+            @Override
+            public byte[] getBody() {
+                return "bun".getBytes();
             }
         };
         ExampleRequestQueue.add(stringRequest);
@@ -352,11 +473,49 @@ public class MainActivity extends AppCompatActivity {
 
     private String checkIfLastMessageFromProfile(String serverResponse, JsonObject jsonObject) {
 
+        String questionString;
         if (String.valueOf(jsonObject.get("question")).length() < 5) {
             userAskQuestion = true;
-            return "Ask me something :D";
-        } else
-            return String.valueOf(jsonObject.get("question"));
+            String defaultQ = "Ask me something :D";
+            getInformation(defaultQ);
+            return defaultQ;
+        } else {
+
+            questionString = String.valueOf(jsonObject.get("question"));
+            getInformation(questionString);
+            if (questionString.contains("What body weight")) {
+                return "Hello " + inputMessage.getText().toString().trim() + " " + questionString;
+            }
+        }
+        return questionString;
     }
+
+    private void getInformation(String question) {
+        if (question.contains("How old are you")) {
+            weight = Double.parseDouble(inputMessage.getText().toString().trim());
+        }
+        if (question.contains("What height")) {
+            age = Double.parseDouble(inputMessage.getText().toString().trim());
+        }
+        if (question.contains("Give me best")) {
+            height = Double.parseDouble(inputMessage.getText().toString().trim());
+        }
+        if (question.contains("What you eat today")) {
+            preferableMenus = Arrays.asList((inputMessage.getText().toString().split(", ")));
+        }
+        if (question.contains("Ask me something")) {
+            eatToday = (inputMessage.getText().toString());
+        }
+    }
+
+    private double bmi(double height, double weight) {
+        return (weight / (height * height)) * 703;
+    }
+
+    private double bf(double height, double weight, double age) {
+        return (1.2 * bmi(height, weight) + 0.23 * age - 16.2);
+    }
+
+
 }
 
