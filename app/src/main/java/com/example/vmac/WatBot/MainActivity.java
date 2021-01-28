@@ -35,6 +35,7 @@ import com.google.gson.JsonParser;
 import com.ibm.watson.developer_cloud.android.library.audio.MicrophoneHelper;
 
 import java.io.UnsupportedEncodingException;
+import java.text.DecimalFormat;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,8 +48,12 @@ public class MainActivity extends AppCompatActivity {
     public static final String DINNER = "dinner";
     public static final String BREAKFAST = "breakfast";
     public static final String LUNCH = "lunch";
-    public static final int MAX_CALORIES = 2500;
-
+    public static final String HOW_OLD_ARE_YOU = "How old are you";
+    public static final String WHAT_HEIGHT = "What height";
+    public static final String GIVE_ME_BEST = "Give me best";
+    public static final String WHAT_YOU_EAT_TODAY = "What you eat today";
+    public static final String ASK_ME_SOMETHING = "Ask me something";
+    public static int MAX_CALORIES = 2500;
 
     private RecyclerView recyclerView;
     private ChatAdapter mAdapter;
@@ -69,10 +74,10 @@ public class MainActivity extends AppCompatActivity {
     double age, height, weight;
     List<String> preferableMenus = new ArrayList<>();
     String eatToday;
+    private static DecimalFormat df2 = new DecimalFormat("#.##");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ExampleRequestQueue = Volley.newRequestQueue(this);
@@ -84,10 +89,8 @@ public class MainActivity extends AppCompatActivity {
         Typeface typeface = Typeface.createFromAsset(getAssets(), customFont);
         inputMessage.setTypeface(typeface);
         recyclerView = findViewById(R.id.recycler_view);
-
         messageArrayList = new ArrayList<>();
         mAdapter = new ChatAdapter(messageArrayList);
-
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setStackFromEnd(true);
         recyclerView.setLayoutManager(layoutManager);
@@ -101,8 +104,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 if (checkInternetConnection()) {
-
-
                     if (userAskQuestion) {
                         final String inputmessage = MainActivity.inputMessage.getText().toString().trim();
                         if (inputmessage.contains("body bmi")) {
@@ -228,7 +229,6 @@ public class MainActivity extends AppCompatActivity {
                                           int count) {
                     //You need to remove this to run only once
                     handler.removeCallbacks(input_finish_checker);
-
                 }
 
                 @Override
@@ -242,7 +242,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             });
-
             mAdapter.notifyDataSetChanged();
         }
     };
@@ -326,7 +325,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
     // Sending a message to Watson Conversation Service
     private void sendMessage() {
         final String inputmessage = this.inputMessage.getText().toString().trim();
@@ -337,7 +335,6 @@ public class MainActivity extends AppCompatActivity {
         getCall();
         mAdapter.notifyDataSetChanged();
     }
-
 
     private void getCall() {
 
@@ -351,7 +348,6 @@ public class MainActivity extends AppCompatActivity {
                 } else {
 
                 }
-
             }
         }, new Response.ErrorListener() { //Create an error listener to handle errors appropriately.
             @Override
@@ -370,12 +366,20 @@ public class MainActivity extends AppCompatActivity {
             public void onResponse(String response) {
                 Log.i("REs", response);
                 JsonObject jsonObject = (JsonObject) jsonParser.parse(response);
-                String jsonAnswer = String.valueOf(jsonObject.get("answer"));
-                Log.i("jsonAnsw", jsonAnswer);
-                jsonAnswer = jsonAnswer.replace("\"", "").trim();
 
-                int numCalories = Integer.parseInt(jsonAnswer.split(" ")[0]);
-                chatBootAskQuestion(jsonAnswer, "2");
+                String jsonAnswer = String.valueOf(jsonObject.get("answer"));
+
+                if (jsonAnswer.contains("calories")) {
+                    Log.i("jsonAnsw", jsonAnswer);
+                    jsonAnswer = jsonAnswer.replace("\"", "").trim();
+
+                    int numCalories = Integer.parseInt(jsonAnswer.split(" ")[0]);
+                    chatBootAskQuestion("You eat " + numCalories + " calories. You should eat up to " + (MAX_CALORIES - numCalories), "2");
+                    MAX_CALORIES = MAX_CALORIES - numCalories;
+
+                } else {
+                    chatBootAskQuestion(jsonAnswer, "2");
+                }
             }
         }, new Response.ErrorListener() {
             @Override
@@ -402,38 +406,8 @@ public class MainActivity extends AppCompatActivity {
             }
         };
         ExampleRequestQueue.add(stringRequest);
-
     }
-
-    private void postCall2(final String body) {
-        String url = "http://10.0.2.2:5000/menu/breakfast/response";
-        StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
-            @Override
-            public void onResponse(String response) {
-                Log.i("REs", response);
-
-                chatBootAskQuestion(response, "2");
-            }
-        }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                Log.e("VOLLEY", error.toString());
-            }
-        }) {
-            @Override
-            public String getBodyContentType() {
-                return "application/json; charset=utf-8";
-            }
-
-            @Override
-            public byte[] getBody() {
-                return "bun".getBytes();
-            }
-        };
-        ExampleRequestQueue.add(stringRequest);
-
-    }
-
+    
     public void chatBootAskQuestion(String s, String s2) {
         Message outMessage = new Message();
         outMessage.setMessage(s);
@@ -491,31 +465,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void getInformation(String question) {
-        if (question.contains("How old are you")) {
+        if (question.contains(HOW_OLD_ARE_YOU)) {
             weight = Double.parseDouble(inputMessage.getText().toString().trim());
         }
-        if (question.contains("What height")) {
+        if (question.contains(WHAT_HEIGHT)) {
             age = Double.parseDouble(inputMessage.getText().toString().trim());
         }
-        if (question.contains("Give me best")) {
+        if (question.contains(GIVE_ME_BEST)
+        ) {
             height = Double.parseDouble(inputMessage.getText().toString().trim());
         }
-        if (question.contains("What you eat today")) {
+        if (question.contains(WHAT_YOU_EAT_TODAY)) {
             preferableMenus = Arrays.asList((inputMessage.getText().toString().split(", ")));
         }
-        if (question.contains("Ask me something")) {
+        if (question.contains(ASK_ME_SOMETHING)) {
             eatToday = (inputMessage.getText().toString());
         }
     }
 
     private double bmi(double height, double weight) {
-        return (weight / (height * height)) * 703;
+        return  Math.abs(Double.parseDouble(df2.format((weight / (height * height)) * 703)));
+
     }
 
     private double bf(double height, double weight, double age) {
-        return (1.2 * bmi(height, weight) + 0.23 * age - 16.2);
+        return Math.abs(Double.parseDouble(df2.format((1.2 * bmi(height, weight) + 0.23 * age - 16.2))));
     }
-
-
 }
-
